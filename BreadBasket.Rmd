@@ -1,0 +1,103 @@
+
+---
+output: 
+  html_document:
+    keep_md: true
+--- 
+
+```{r}
+#install and load package arules
+library(arules)
+#install and load arulesViz
+library(arulesViz)
+#install and load tidyverse
+library(tidyverse)
+#install and load readxml
+library(readxl)
+#install and load knitr
+library(knitr)
+#load ggplot2 as it comes in tidyverse
+library(ggplot2)
+#install and load lubridate
+library(lubridate)
+#install and load plyr
+library(plyr)
+library(dplyr)
+
+#Set a working directory
+setwd("/DataSets")
+#load the data
+BreadBasket <- read.csv("BreadBasket_DMS.csv")
+
+
+BreadBasket <- BreadBasket[complete.cases(BreadBasket), ]
+
+# Removing NONE
+BreadBasket <- BreadBasket[!(BreadBasket$Item=="NONE"),]
+
+#Factor Item 
+BreadBasket %>% mutate(Item = as.factor(Item)) 
+
+#Transaction into numeric type
+TransNum = as.numeric(as.character(BreadBasket$Transaction))
+
+#Combine new columns into dataframe BreadBasket
+cbind(BreadBasket,TransNum)
+
+
+#ddply(dataframe, variables_to_be_used_to_split_data_frame, function_to_be_applied)
+TransactionData <- ddply(BreadBasket,c("TransNum"),
+                         function(df1)paste(df1$Item,
+                                            collapse = ","))
+TransactionData
+TransactionData$TransNum <- NULL
+TransactionData
+
+#create Transaction_csv file
+write.csv(TransactionData,"transactions_data.csv", quote = FALSE, row.names = FALSE)
+
+TransData <- read.transactions("transactions_data.csv", format = 'basket', sep=',')
+
+TransData
+summary(TransData)
+
+# Create an item frequency plot for the top 20 items
+if (!require("RColorBrewer")) {
+  # install color package of R
+  install.packages("RColorBrewer")
+  #include library RColorBrewer
+  library(RColorBrewer)
+}
+
+#Absolute Item Frequency Plot which list all the distincts items in summary
+itemFrequencyPlot(TransData,topN=20,type="absolute",col=brewer.pal(8,'Pastel2'), main="Absolute Item Frequency Plot")
+
+```
+
+The Absolute Item Frequency Plot clearly indicates that the majority is the Coffee consummers, then bread, and so on.
+
+
+```{r}
+
+#Association rules which use Apriori Algorithm with support level 0.1%, and confidence level of 80%
+association.rules <- apriori(TransData, parameter = list(supp=0.001, conf=0.80))
+
+count(BreadBasket$Item)
+itemsHere <- unique(BreadBasket$Item)
+view(itemsHere)
+count(itemsHere)
+
+association.rules <- sort(association.rules, decreasing=TRUE,by="lift")
+
+inspect(association.rules[1:5])
+
+```
+
+The first 5 association rules in order can be described as follow. 
+87.50% of the customers who bought Extra Salami or Feta,Salad also bought Coffee,
+86.67% of the customers who bought Pastry,Toast also bought Coffee,
+85.71% of the customers who bought Hearty & Seasonal,Sandwich also bought Coffee,
+83.33% of the customers who bought Cake,Vegan mincepie also bought Coffee,
+83.33% of the customers who bought Salad,Sandwich also bought Coffee.
+Overall, those selected transactions have lift above 1 , which means that there is a positive correlation between those items sets.
+
